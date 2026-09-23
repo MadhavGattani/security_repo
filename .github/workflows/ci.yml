@@ -13,6 +13,26 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: studentdb
+          MYSQL_ROOT_PASSWORD: 1234
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/demo
+      SPRING_DATASOURCE_USERNAME: demo
+      SPRING_DATASOURCE_PASSWORD: demo
+      SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
+
     steps:
 
       # -----------------------------------------
@@ -41,7 +61,7 @@ jobs:
           mvn clean verify
 
       # -----------------------------------------
-      # 4. Generate / Verify JaCoCo Coverage
+      # 4. Generate JaCoCo Coverage
       # -----------------------------------------
       - name: Generate JaCoCo Coverage Report
         run: |
