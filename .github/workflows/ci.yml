@@ -1,40 +1,34 @@
 name: Java CI Pipeline
-
+ 
 on:
   push:
     branches:
       - main
-
+ 
   pull_request:
     branches:
       - main
-
+ 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+ 
     services:
       mysql:
         image: mysql:8.4
-        env:
-          MYSQL_DATABASE: studentdb
-          MYSQL_ROOT_PASSWORD: 1234
         ports:
           - 3306:3306
+        env:
+          MYSQL_ROOT_PASSWORD: 1234
+          MYSQL_DATABASE: studentdb
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p1234"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
-
-    env:
-      SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/demo
-      SPRING_DATASOURCE_USERNAME: demo
-      SPRING_DATASOURCE_PASSWORD: demo
-      SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
-
+ 
     steps:
-
+ 
       # -----------------------------------------
       # 1. Checkout source code
       # -----------------------------------------
@@ -42,7 +36,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
+ 
       # -----------------------------------------
       # 2. Setup JDK 21
       # -----------------------------------------
@@ -52,23 +46,27 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-
+ 
       # -----------------------------------------
       # 3. Build and Run Unit Tests
       # -----------------------------------------
       - name: Build and Test
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/studentdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: 1234
         run: |
           mvn clean verify
-
+ 
       # -----------------------------------------
-      # 4. Generate JaCoCo Coverage
+      # 4. Generate / Verify JaCoCo Coverage
       # -----------------------------------------
       - name: Generate JaCoCo Coverage Report
         run: |
           mvn jacoco:report
-
+ 
       # -----------------------------------------
-      # 5. Check Code Coverage >= 20%
+      # 5. Check Code Coverage >= 90%
       # -----------------------------------------
       - name: Check Code Coverage
         shell: bash
@@ -76,61 +74,61 @@ jobs:
           python3 - <<'PY'
           import xml.etree.ElementTree as ET
           import sys
-
+ 
           report = "target/site/jacoco/jacoco.xml"
-
+ 
           try:
               tree = ET.parse(report)
           except FileNotFoundError:
               print("ERROR: JaCoCo report not found:")
               print(report)
               sys.exit(1)
-
+ 
           root = tree.getroot()
-
+ 
           instruction_counter = None
-
+ 
           for counter in root.findall("counter"):
               if counter.attrib.get("type") == "INSTRUCTION":
                   instruction_counter = counter
                   break
-
+ 
           if instruction_counter is None:
               print("ERROR: INSTRUCTION coverage data not found.")
               sys.exit(1)
-
+ 
           missed = int(instruction_counter.attrib["missed"])
           covered = int(instruction_counter.attrib["covered"])
-
+ 
           total = missed + covered
-
+ 
           if total == 0:
               print("ERROR: No instructions found in JaCoCo report.")
               sys.exit(1)
-
+ 
           coverage = (covered / total) * 100
-
+ 
           print(f"Code Coverage: {coverage:.2f}%")
-          print("Required Coverage: 20.00%")
-
+          print("Required Coverage: 90.00%")
+ 
           if coverage < 20:
               print("QUALITY GATE FAILED")
-              print("Code coverage is below 20%.")
+              print("Code coverage is below 90%.")
               sys.exit(1)
-
+ 
           print("QUALITY GATE PASSED")
-          print("Code coverage is 20% or higher.")
+          print("Code coverage is 90% or higher.")
           PY
-
-      # # -----------------------------------------
-      # # 6. SonarQube Analysis
-      # # -----------------------------------------
+ 
+      # -----------------------------------------
+      # 6. SonarQube Analysis
+      # -----------------------------------------
       # - name: SonarQube Analysis
       #   uses: SonarSource/sonarqube-scan-action@v7
       #   env:
       #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       #     SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
+ 
       # # -----------------------------------------
       # # 7. SonarQube Quality Gate
       # # -----------------------------------------
@@ -139,14 +137,14 @@ jobs:
       #   timeout-minutes: 10
       #   env:
       #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
+ 
       # -----------------------------------------
       # 8. Package Application
       # -----------------------------------------
       - name: Package JAR
         run: |
           mvn package -DskipTests
-
+ 
       # -----------------------------------------
       # 9. Upload JAR
       # -----------------------------------------
@@ -155,7 +153,7 @@ jobs:
         with:
           name: springboot-application
           path: target/*.jar
-
+ 
       # -----------------------------------------
       # 10. Upload JaCoCo Report
       # -----------------------------------------
